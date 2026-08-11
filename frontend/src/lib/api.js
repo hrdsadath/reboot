@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
 // Helper to get auth token from localStorage
 export const getAuthToken = () => {
@@ -17,8 +17,11 @@ export async function apiRequest(endpoint, options = {}) {
     ...options.headers
   };
 
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const fullUrl = `${API_BASE}${formattedEndpoint}`;
+
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetch(fullUrl, {
       ...options,
       headers
     });
@@ -31,10 +34,10 @@ export async function apiRequest(endpoint, options = {}) {
     }
     return data;
   } catch (err) {
-    console.warn('Backend API connection error:', err);
+    console.warn(`Backend API connection error on ${fullUrl}:`, err);
     return {
       success: false,
-      message: 'Server connection error. Please ensure backend service is running and MongoDB Atlas IP is whitelisted.'
+      message: `Server connection error calling ${fullUrl}. Please check NEXT_PUBLIC_API_URL in Vercel settings.`
     };
   }
 }
