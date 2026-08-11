@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Helper to get auth token from localStorage
 export const getAuthToken = () => {
@@ -8,7 +8,7 @@ export const getAuthToken = () => {
   return null;
 };
 
-// Helper for HTTP requests with backend error handling
+// Helper for HTTP requests with environment API base handling
 export async function apiRequest(endpoint, options = {}) {
   const token = getAuthToken();
   const headers = {
@@ -34,7 +34,7 @@ export async function apiRequest(endpoint, options = {}) {
     console.warn('Backend API connection error:', err);
     return {
       success: false,
-      message: 'Server error: Unable to communicate with backend on port 5000. Please check MongoDB Atlas IP Whitelist.'
+      message: 'Server connection error. Please ensure backend service is running and MongoDB Atlas IP is whitelisted.'
     };
   }
 }
