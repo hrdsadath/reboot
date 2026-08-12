@@ -7,7 +7,7 @@ import GameCard from '@/components/GameCard';
 import Leaderboard from '@/components/Leaderboard';
 import TeamRevealModal from '@/components/TeamRevealModal';
 import { apiRequest } from '@/lib/api';
-import { User, Award, Users, Lock, Trophy, Sparkles, CheckCircle2, Crown, RefreshCw } from 'lucide-react';
+import { User, Award, Lock, Trophy, Sparkles, CheckCircle2, Crown, RefreshCw, CheckSquare } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -24,7 +24,6 @@ export default function DashboardPage() {
   const fetchData = async () => {
     setLoading(true);
 
-    // Get currentUser from localStorage
     let userObj = null;
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('iedc_user');
@@ -37,11 +36,11 @@ export default function DashboardPage() {
     }
 
     if (!userObj) {
-      router.push('/login');
+      router.push('/');
       return;
     }
 
-    // 1. Fetch User Info & Group Info
+    // 1. Fetch Group Info
     const groupRes = await apiRequest('/groups/my-group');
     if (groupRes.success) {
       setMyGroup(groupRes.group);
@@ -54,7 +53,7 @@ export default function DashboardPage() {
       setGames(gamesRes.games || []);
     }
 
-    // 3. Fetch User Submissions
+    // 3. Fetch User Submissions & Activities
     const subRes = await apiRequest('/games/my-submissions');
     if (subRes.success) {
       setUserSubmissions(subRes.submissions || []);
@@ -81,16 +80,14 @@ export default function DashboardPage() {
     });
 
     if (res.success) {
-      // Update local points
       if (currentUser) {
-        const updated = { ...currentUser, individualPoints: res.updatedPoints };
+        const updated = { ...currentUser, personalPoints: res.updatedPoints, individualPoints: res.updatedPoints };
         setCurrentUser(updated);
         if (typeof window !== 'undefined') {
           localStorage.setItem('iedc_user', JSON.stringify(updated));
         }
       }
 
-      // If Game 2 completed -> trigger celebratory reveal modal!
       if (Number(gameNumber) === 2) {
         setIsGroupRevealed(true);
         setShowRevealModal(true);
@@ -108,17 +105,17 @@ export default function DashboardPage() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-8">
         
-        {/* Top Profile Banner */}
+        {/* Top Student Profile & Leader Summary */}
         <div className="glass-card rounded-3xl p-6 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-white font-black text-xl shadow-lg">
-              {currentUser?.fullName?.charAt(0) || 'U'}
+              {currentUser?.name?.charAt(0) || currentUser?.fullName?.charAt(0) || 'S'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-white">{currentUser?.fullName || 'Student Candidate'}</h1>
+                <h1 className="text-2xl font-black text-white">{currentUser?.name || currentUser?.fullName || 'Student Candidate'}</h1>
                 <span className="text-xs uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                  {currentUser?.role || 'user'}
+                  Candidate
                 </span>
               </div>
               <div className="text-xs text-slate-400 flex items-center gap-3 mt-1">
@@ -126,34 +123,46 @@ export default function DashboardPage() {
                 <span>•</span>
                 <span>{currentUser?.phone}</span>
                 <span>•</span>
-                <span className="text-indigo-300 font-semibold">{currentUser?.preferredLeadTrack} Track</span>
+                <span className="text-indigo-300 font-semibold">{currentUser?.department || 'CS'}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 self-stretch md:self-auto justify-between md:justify-end">
+          <div className="flex items-center gap-4 self-stretch md:self-auto justify-between md:justify-end">
+            
+            {/* Volunteer Leader Display */}
+            <div className="bg-slate-900/90 border border-amber-500/30 px-4 py-2.5 rounded-2xl flex items-center gap-3">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <div>
+                <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Group Leader</div>
+                <div className="text-sm font-bold text-white">
+                  {myGroup?.leader ? (typeof myGroup.leader === 'object' ? myGroup.leader.name : myGroup.leader) : myGroup?.leaderName || 'Assigned by Admin'}
+                </div>
+              </div>
+            </div>
+
+            {/* Student Personal Points */}
             <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl flex items-center gap-3">
               <Award className="w-6 h-6 text-amber-400" />
               <div>
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">My Points</div>
-                <div className="text-lg font-black text-amber-400">{currentUser?.individualPoints || 0} PTS</div>
+                <div className="text-lg font-black text-amber-400">{currentUser?.personalPoints || currentUser?.individualPoints || 0} PTS</div>
               </div>
             </div>
 
             <button
               onClick={fetchData}
-              className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
-              title="Refresh Data"
+              className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+              title="Refresh Stats"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* TEAM ASSIGNMENT STATUS CARD */}
+        {/* GROUP STATUS CARD */}
         <div className="glass-card rounded-3xl p-6 border border-slate-800 relative overflow-hidden">
           {!isGroupRevealed ? (
-            /* LOCKED SECRET TEAM VIEW */
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
@@ -163,9 +172,9 @@ export default function DashboardPage() {
                   <span className="text-[11px] uppercase font-extrabold tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
                     Secret Team Assignment
                   </span>
-                  <h3 className="text-lg font-bold text-white mt-1">Group Details Locked Until Game 2 Completion</h3>
+                  <h3 className="text-lg font-bold text-white mt-1">Team Details Secret Until Game 2</h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    You are assigned to <strong>Group #{currentUser?.groupNumber || '1'}</strong> via Round-Robin, but teammate names are secret until Game 2!
+                    Assigned to <strong>{myGroup?.name || `Group #${currentUser?.groupNumber || '1'}`}</strong> via Round-Robin. Finish Game 1 & Game 2 to reveal!
                   </p>
                 </div>
               </div>
@@ -175,44 +184,62 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            /* REVEALED TEAM CARD */
-            <div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg">
-                    #{myGroup?.groupNumber || currentUser?.groupNumber || '1'}
-                  </div>
-                  <div>
-                    <span className="text-xs uppercase font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                      🎉 Group Revealed
-                    </span>
-                    <h3 className="text-xl font-bold text-white mt-1">{myGroup?.groupName || `Group ${currentUser?.groupNumber}`}</h3>
-                    <p className="text-xs text-slate-400">Leader: <strong className="text-amber-400">{myGroup?.leaderName || 'Alex Vance'}</strong></p>
-                  </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg">
+                  #{myGroup?.name ? myGroup.name.replace('Group ', '') : currentUser?.groupNumber || '1'}
                 </div>
-
-                <div className="bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-2xl text-right">
-                  <div className="text-[10px] uppercase font-bold text-emerald-400">Cumulative Team Score</div>
-                  <div className="text-base font-black text-emerald-300">{myGroup?.totalTeamPoints || 0} PTS</div>
+                <div>
+                  <span className="text-xs uppercase font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                    🎉 Group Unlocked
+                  </span>
+                  <h3 className="text-xl font-bold text-white mt-1">{myGroup?.name || `Group ${currentUser?.groupNumber}`}</h3>
+                  <p className="text-xs text-slate-400">
+                    Volunteer Judge / Leader: <strong className="text-amber-400">{myGroup?.leader ? (typeof myGroup.leader === 'object' ? myGroup.leader.name : myGroup.leader) : myGroup?.leaderName || 'Assigned by Admin'}</strong>
+                  </p>
                 </div>
               </div>
 
-              {/* Members List */}
-              {myGroup?.members && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-4 border-t border-slate-800/80">
-                  {myGroup.members.map((m, i) => (
-                    <div key={m._id || i} className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-                      <div className="font-bold text-white truncate">{m.fullName}</div>
-                      <div className="text-[11px] text-slate-400 flex items-center justify-between mt-1">
-                        <span>{m.preferredLeadTrack}</span>
-                        <span className="text-amber-400 font-bold">{m.individualPoints || 0} pts</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-2xl text-right">
+                <div className="text-[10px] uppercase font-bold text-emerald-400">Cumulative Team Score</div>
+                <div className="text-base font-black text-emerald-300">{myGroup?.teamPoints || myGroup?.totalTeamPoints || 0} PTS</div>
+              </div>
             </div>
           )}
+        </div>
+
+        {/* STUDENT'S ACTIVITIES & SUBMISSIONS SUMMARY */}
+        <div className="glass-card rounded-3xl p-6 border border-slate-800">
+          <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-indigo-400" />
+            My Activities & Submission Points
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">View your completed tasks and volunteer judge point approvals</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userSubmissions.length === 0 ? (
+              <div className="col-span-full text-center py-6 text-slate-500 italic text-sm">
+                You have not submitted any game activities yet. Complete Game 1 below to get started!
+              </div>
+            ) : (
+              userSubmissions.map((sub, i) => (
+                <div key={sub._id || i} className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-indigo-400">
+                      {sub.gameId ? sub.gameId.name : `Game #${sub.gameNumber || '1'}`}
+                    </span>
+                    <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      +{sub.personalPoints || sub.individualPointsAwarded || 0} PTS
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 truncate mb-2">{sub.answer || sub.submissionText || 'Submission completed'}</p>
+                  {sub.choice && (
+                    <div className="text-[11px] text-slate-400">Format: <strong className="text-white">{sub.choice}</strong></div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* 6 GAMES ARENA GRID */}
@@ -223,7 +250,7 @@ export default function DashboardPage() {
                 <Sparkles className="w-6 h-6 text-indigo-400" />
                 6 Selection Challenges
               </h2>
-              <p className="text-xs text-slate-400">Complete each task to earn individual & team lead points</p>
+              <p className="text-xs text-slate-400">Complete each challenge to earn points</p>
             </div>
             <span className="text-xs text-slate-400 font-mono">
               {userSubmissions.length} of {games.length} Completed
@@ -232,7 +259,7 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {games.map((game) => {
-              const isSubmitted = userSubmissions.some((s) => s.gameNumber === game.gameNumber);
+              const isSubmitted = userSubmissions.some((s) => (s.gameNumber === game.gameNumber || (s.gameId && s.gameId._id === game._id)));
               return (
                 <GameCard
                   key={game._id || game.gameNumber}

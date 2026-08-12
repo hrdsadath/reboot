@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { apiRequest } from '@/lib/api';
-import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck, Award, Sparkles } from 'lucide-react';
+import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck, Award, Sparkles, KeyRound, X } from 'lucide-react';
 
 export default function RootPage() {
   const router = useRouter();
@@ -12,6 +12,11 @@ export default function RootPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Admin Passkey Modal State
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPasskey, setAdminPasskey] = useState('');
+  const [adminError, setAdminError] = useState('');
 
   // Form Fields
   const [name, setName] = useState('');
@@ -82,20 +87,25 @@ export default function RootPage() {
     setLoading(false);
   };
 
-  const handleQuickAdminLogin = async () => {
+  const handleAdminPasskeyLogin = async (e) => {
+    e.preventDefault();
+    setAdminError('');
     setLoading(true);
-    const res = await apiRequest('/auth/create-admin', { method: 'POST' });
+
+    const res = await apiRequest('/auth/create-admin', {
+      method: 'POST',
+      body: JSON.stringify({ secretKey: adminPasskey })
+    });
+
     if (res.success) {
-      setSuccessMsg('Logged in as Executive Admin!');
       if (typeof window !== 'undefined') {
         localStorage.setItem('iedc_token', res.token);
         localStorage.setItem('iedc_user', JSON.stringify(res.admin));
       }
-      setTimeout(() => {
-        router.push('/admin');
-      }, 800);
+      setShowAdminModal(false);
+      router.push('/admin');
     } else {
-      setErrorMsg('Admin login failed.');
+      setAdminError(res.message || 'Invalid Secret Passkey.');
     }
     setLoading(false);
   };
@@ -245,18 +255,23 @@ export default function RootPage() {
             </button>
           </form>
 
-          {/* Quick Admin Button */}
-          <div className="mt-4 pt-4 border-t border-slate-800/80">
+          {/* Secure Admin Passkey Link */}
+          <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <span>Executive Cell?</span>
             <button
-              onClick={handleQuickAdminLogin}
-              className="w-full py-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center justify-center gap-2"
+              onClick={() => {
+                setShowAdminModal(true);
+                setAdminError('');
+                setAdminPasskey('');
+              }}
+              className="font-bold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1.5"
             >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Log In as Executive Admin</span>
+              <ShieldCheck className="w-4 h-4" />
+              <span>Admin Key Access</span>
             </button>
           </div>
 
-          {/* Toggle */}
+          {/* Toggle Register/Login */}
           <div className="text-center mt-4">
             <button
               onClick={() => {
@@ -274,6 +289,57 @@ export default function RootPage() {
 
         </div>
       </div>
+
+      {/* ADMIN PASSKEY MODAL */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 border border-amber-500/30 glow-amber shadow-2xl">
+            <button
+              onClick={() => setShowAdminModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/60"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto mb-2">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Executive Admin Access</h3>
+              <p className="text-xs text-slate-400 mt-1">Enter Secret Admin Passkey to verify administrator identity</p>
+            </div>
+
+            {adminError && (
+              <div className="mb-3 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold text-center">
+                {adminError}
+              </div>
+            )}
+
+            <form onSubmit={handleAdminPasskeyLogin} className="space-y-4">
+              <div>
+                <label className="text-xs uppercase font-extrabold text-slate-400 block mb-1">Secret Admin Passkey</label>
+                <input
+                  type="password"
+                  required
+                  value={adminPasskey}
+                  onChange={(e) => setAdminPasskey(e.target.value)}
+                  placeholder="Enter secret passkey"
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all"
+              >
+                {loading ? 'Verifying...' : 'Authenticate Admin Access'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
