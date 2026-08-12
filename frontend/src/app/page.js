@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { apiRequest } from '@/lib/api';
-import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck, Award, Sparkles, KeyRound, X } from 'lucide-react';
+import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck, Sparkles, KeyRound, X } from 'lucide-react';
 
 export default function RootPage() {
   const router = useRouter();
@@ -13,10 +13,11 @@ export default function RootPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Admin Passkey Modal State
+  // Admin Security Passkey Modal State
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPasskey, setAdminPasskey] = useState('');
   const [adminError, setAdminError] = useState('');
+  const [pendingAdminEmail, setPendingAdminEmail] = useState('');
 
   // Form Fields
   const [name, setName] = useState('');
@@ -69,6 +70,15 @@ export default function RootPage() {
         body: JSON.stringify({ email, phone, admissionNo })
       });
 
+      if (res.requiresAdminKey) {
+        setPendingAdminEmail(email || res.email);
+        setShowAdminModal(true);
+        setAdminError('');
+        setAdminPasskey('');
+        setLoading(false);
+        return;
+      }
+
       if (res.success) {
         setSuccessMsg('Log in successful! Redirecting...');
         if (typeof window !== 'undefined') {
@@ -92,20 +102,25 @@ export default function RootPage() {
     setAdminError('');
     setLoading(true);
 
-    const res = await apiRequest('/auth/create-admin', {
+    const res = await apiRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ secretKey: adminPasskey })
+      body: JSON.stringify({
+        email: pendingAdminEmail || email,
+        phone,
+        admissionNo,
+        secretKey: adminPasskey
+      })
     });
 
-    if (res.success) {
+    if (res.success && res.user && res.user.role === 'admin') {
       if (typeof window !== 'undefined') {
         localStorage.setItem('iedc_token', res.token);
-        localStorage.setItem('iedc_user', JSON.stringify(res.admin));
+        localStorage.setItem('iedc_user', JSON.stringify(res.user));
       }
       setShowAdminModal(false);
       router.push('/admin');
     } else {
-      setAdminError(res.message || 'Invalid Secret Passkey.');
+      setAdminError(res.message || 'Invalid Secret Security Passkey.');
     }
     setLoading(false);
   };
@@ -255,24 +270,8 @@ export default function RootPage() {
             </button>
           </form>
 
-          {/* Secure Admin Passkey Link */}
-          <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-            <span>Executive Cell?</span>
-            <button
-              onClick={() => {
-                setShowAdminModal(true);
-                setAdminError('');
-                setAdminPasskey('');
-              }}
-              className="font-bold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1.5"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Admin Key Access</span>
-            </button>
-          </div>
-
           {/* Toggle Register/Login */}
-          <div className="text-center mt-4">
+          <div className="text-center mt-6 pt-4 border-t border-slate-800/80">
             <button
               onClick={() => {
                 setIsRegister(!isRegister);
@@ -290,9 +289,9 @@ export default function RootPage() {
         </div>
       </div>
 
-      {/* ADMIN PASSKEY MODAL */}
+      {/* ADMIN PASSKEY VERIFICATION MODAL */}
       {showAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 border border-amber-500/30 glow-amber shadow-2xl">
             <button
               onClick={() => setShowAdminModal(false)}
@@ -305,8 +304,10 @@ export default function RootPage() {
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto mb-2">
                 <KeyRound className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white">Executive Admin Access</h3>
-              <p className="text-xs text-slate-400 mt-1">Enter Secret Admin Passkey to verify administrator identity</p>
+              <h3 className="text-lg font-bold text-white">Admin Account Detected</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Account <strong>{pendingAdminEmail}</strong> has Administrator rights. Please enter the Admin Security Key to proceed.
+              </p>
             </div>
 
             {adminError && (
@@ -317,13 +318,14 @@ export default function RootPage() {
 
             <form onSubmit={handleAdminPasskeyLogin} className="space-y-4">
               <div>
-                <label className="text-xs uppercase font-extrabold text-slate-400 block mb-1">Secret Admin Passkey</label>
+                <label className="text-xs uppercase font-extrabold text-slate-400 block mb-1">Security Key (Passkey)</label>
                 <input
                   type="password"
                   required
+                  autoFocus
                   value={adminPasskey}
                   onChange={(e) => setAdminPasskey(e.target.value)}
-                  placeholder="Enter secret passkey"
+                  placeholder="Enter admin security key"
                   className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -331,9 +333,9 @@ export default function RootPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs transition-all shadow-md"
               >
-                {loading ? 'Verifying...' : 'Authenticate Admin Access'}
+                {loading ? 'Verifying Key...' : 'Verify Key & Enter Admin Panel'}
               </button>
             </form>
           </div>

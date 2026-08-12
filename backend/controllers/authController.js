@@ -112,7 +112,7 @@ exports.register = async (req, res) => {
         admissionNo,
         department,
         role: requestedRole,
-        groupId: targetGroup._id,
+        groupId: targetGroup ? targetGroup._id : null,
         groupNumber: groupNum,
         personalPoints: 0
       };
@@ -139,7 +139,6 @@ exports.createAdmin = async (req, res) => {
   try {
     const { secretKey, email, phone, admissionNo, name, department } = req.body;
 
-    // Verify secret passkey to prevent unauthorized admin access
     if (!secretKey || secretKey !== ADMIN_SECRET_KEY) {
       return res.status(401).json({
         success: false,
@@ -184,7 +183,6 @@ exports.createAdmin = async (req, res) => {
         admin
       });
     } else {
-      // Memory Fallback
       let admin = inMemoryData.users.find(u => u.email === adminEmail || u.role === 'admin');
       if (!admin) {
         admin = {
@@ -209,7 +207,7 @@ exports.createAdmin = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { email, phone, admissionNo } = req.body;
+    const { email, phone, admissionNo, secretKey } = req.body;
 
     if (!email && !phone && !admissionNo) {
       return res.status(400).json({
@@ -230,6 +228,18 @@ exports.login = async (req, res) => {
           success: false,
           message: 'User account not found. Please check credentials or register.'
         });
+      }
+
+      // If user has admin role, verify security key
+      if (user.role === 'admin') {
+        if (!secretKey || secretKey !== ADMIN_SECRET_KEY) {
+          return res.status(200).json({
+            success: false,
+            requiresAdminKey: true,
+            email: user.email,
+            message: 'Security Passkey required for Admin accounts.'
+          });
+        }
       }
 
       const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -263,6 +273,17 @@ exports.login = async (req, res) => {
           success: false,
           message: 'User account not found. Please check credentials or register.'
         });
+      }
+
+      if (user.role === 'admin') {
+        if (!secretKey || secretKey !== ADMIN_SECRET_KEY) {
+          return res.status(200).json({
+            success: false,
+            requiresAdminKey: true,
+            email: user.email,
+            message: 'Security Passkey required for Admin accounts.'
+          });
+        }
       }
 
       const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });

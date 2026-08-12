@@ -7,10 +7,10 @@ const { inMemoryData, isMongoConnected } = require('../utils/storage');
 const defaultGames = [
   {
     gameNumber: 1,
-    name: 'Game 1: Introduce Yourself (Stage vs Screen)',
+    name: 'Game 1: Icebreaker Spotlight Pitch',
     category: 'creative',
     type: 'individual',
-    options: ['On Stage Pitch', 'On App Submission'],
+    options: ['On Stage', 'On App'],
     points: { personal: 20, team: 0 },
     visibleToUser: true
   },
@@ -77,14 +77,42 @@ exports.getGames = async (req, res) => {
   }
 };
 
+exports.updateGameVisibility = async (req, res) => {
+  try {
+    const { gameId, gameNumber, visibleToUser, isVisible } = req.body;
+    const visibility = visibleToUser !== undefined ? visibleToUser : isVisible;
+
+    if (isMongoConnected()) {
+      let game;
+      if (gameId) game = await Game.findByIdAndUpdate(gameId, { visibleToUser: visibility }, { new: true });
+      else if (gameNumber) game = await Game.findOneAndUpdate({ gameNumber }, { visibleToUser: visibility }, { new: true });
+      return res.json({ success: true, message: 'Updated game visibility status!', game });
+    } else {
+      const gNum = Number(gameNumber) || 1;
+      const game = inMemoryData.games.find(g => g.gameNumber === gNum);
+      if (game) game.visibleToUser = visibility;
+      return res.json({ success: true, message: 'Updated game visibility status in memory!', game });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.submitTask = async (req, res) => {
   try {
     const userId = req.user.id;
     const { gameNumber, gameId, chosenOption, choice, submissionText, answer } = req.body;
 
-    const targetOption = chosenOption || choice;
-    const targetText = submissionText || answer;
     const gNum = Number(gameNumber) || 1;
+    const targetOption = chosenOption || choice || (gNum === 1 ? 'On Stage' : null);
+    const targetText = submissionText || answer || '';
+
+    const isStage = gNum === 1 && (
+      !targetOption ||
+      targetOption === 'On Stage' ||
+      targetOption === 'stage' ||
+      targetOption.toLowerCase().includes('stage')
+    );
 
     if (isMongoConnected()) {
       let game = gameId ? await Game.findById(gameId) : await Game.findOne({ gameNumber: gNum });
@@ -92,61 +120,154 @@ exports.submitTask = async (req, res) => {
 
       if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
-      let pPoints = (game && game.points) ? game.points.personal : (gNum === 1 ? (targetOption === 'stage' || targetOption === 'On Stage Pitch' ? 20 : 5) : 10);
+      let pPoints = 0;
       let tPoints = (game && game.points) ? game.points.team : 0;
+      let subStatus = 'approved';
 
       if (gNum === 1) {
-        if (targetOption === 'stage' || targetOption === 'On Stage Pitch') pPoints = 20;
-        else pPoints = 5;
+        if (isStage) {
+          pPoints = 0; // Pending Admin Approval for +20 PTS
+          subStatus = 'pending';
+        } else {
+          pPoints = 5; // Automatic +5 PTS for On App
+          subStatus = 'approved';
+        }
+      } else {
+        pPoints = (game && game.points) ? game.points.personal : 10;
+        subStatus = 'approved';
       }
 
-      const submission = await Submission.create({
-        userId: user._id,
-        groupId: user.groupId,
-        gameId: game ? game._id : user._id,
-        choice: targetOption || null,
-        answer: targetText || '',
-        personalPoints: pPoints,
-        teamPoints: tPoints
-      });
+      let existingSub = await Submission.findOne({ userId: user._id, gameNumber: gNum });
+      let submission;
 
-      user.personalPoints += pPoints;
+      if (existingSub) {
+        existingSub.choice = isStage ? 'On Stage' : 'On App';
+        existingSub.answer = targetText;
+        existingSub.personalPoints = pPoints;
+        existingSub.teamPoints = tPoints;
+        existingSub.status = subStatus;
+        submission = await existingSub.save();
+      } else {
+        submission = await Submission.create({
+          userId: user._id,
+          groupId: user.groupId || user._id,
+          gameId: game ? game._id : user._id,
+          gameNumber: gNum,
+          choice: isStage ? 'On Stage' : 'On App',
+          answer: targetText,
+          personalPoints: pPoints,
+          teamPoints: tPoints,
+          status: subStatus
+        });
+      }
+
+      if (subStatus === 'approved' && pPoints > 0) {
+        user.personalPoints += pPoints;
+      }
       if (!user.completedGames) user.completedGames = [];
       user.completedGames.push({ gameId: game ? game._id : user._id, score: pPoints, completedAt: new Date() });
       await user.save();
 
+      const responseMessage = isStage
+        ? 'Stage pitch claim submitted! Waiting for Admin verification on stage to approve +20 PTS.'
+        : `Task submitted successfully! Earned +${pPoints} personal points.`;
+
       return res.status(201).json({
         success: true,
-        message: `Task submitted successfully! Earned +${pPoints} personal points.`,
+        message: responseMessage,
         submission,
+        status: subStatus,
         updatedPoints: user.personalPoints
       });
     } else {
       // Memory Fallback
       const user = inMemoryData.users.find(u => u._id === userId);
-      let pPoints = gNum === 1 ? (targetOption === 'stage' || targetOption === 'On Stage Pitch' ? 20 : 5) : 10;
+      const pPoints = gNum === 1 ? (isStage ? 0 : 5) : 10;
+      const subStatus = (gNum === 1 && isStage) ? 'pending' : 'approved';
 
-      if (user) {
+      if (user && subStatus === 'approved') {
         user.individualPoints = (user.individualPoints || user.personalPoints || 0) + pPoints;
         user.personalPoints = user.individualPoints;
       }
 
-      if (gNum === 2) {
-        inMemoryData.groups.forEach(g => g.isRevealed = true);
-      }
+      const memSubmission = {
+        _id: `sub_${Date.now()}`,
+        userId: user ? { _id: user._id, name: user.name, department: user.department } : null,
+        gameNumber: gNum,
+        choice: isStage ? 'On Stage' : 'On App',
+        answer: targetText,
+        personalPoints: pPoints,
+        teamPoints: 0,
+        status: subStatus,
+        createdAt: new Date()
+      };
+
+      if (!inMemoryData.submissions) inMemoryData.submissions = [];
+      inMemoryData.submissions.push(memSubmission);
 
       return res.status(201).json({
         success: true,
-        message: `Task submitted successfully! Earned +${pPoints} personal points.`,
+        message: isStage ? 'Stage pitch claim submitted for Admin verification (+20 PTS pending).' : `Task submitted successfully! Earned +${pPoints} personal points.`,
+        submission: memSubmission,
+        status: subStatus,
         updatedPoints: user ? user.personalPoints : pPoints
       });
+    }
+  } catch (error) {
+    console.error('Submit error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin Stage Claim Approval / Rejection
+exports.approveStageClaim = async (req, res) => {
+  try {
+    const { submissionId, status } = req.body; // 'approved' or 'rejected'
+
+    if (!submissionId || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid submissionId or status' });
+    }
+
+    if (isMongoConnected()) {
+      const submission = await Submission.findById(submissionId);
+      if (!submission) return res.status(404).json({ success: false, message: 'Submission not found' });
+
+      submission.status = status;
+      if (status === 'approved') {
+        submission.personalPoints = 20;
+        await submission.save();
+
+        const user = await User.findById(submission.userId);
+        if (user) {
+          user.personalPoints += 20;
+          await user.save();
+        }
+        return res.json({ success: true, message: `Stage claim APPROVED! +20 Points granted to candidate.` });
+      } else {
+        submission.personalPoints = 0;
+        await submission.save();
+        return res.json({ success: true, message: `Stage claim REJECTED. 0 Points granted.` });
+      }
+    } else {
+      if (!inMemoryData.submissions) inMemoryData.submissions = [];
+      const sub = inMemoryData.submissions.find(s => s._id === submissionId);
+      if (sub) {
+        sub.status = status;
+        if (status === 'approved') {
+          sub.personalPoints = 20;
+          const user = inMemoryData.users.find(u => u._id === sub.userId || (sub.userId && u._id === sub.userId._id));
+          if (user) user.personalPoints = (user.personalPoints || 0) + 20;
+        } else {
+          sub.personalPoints = 0;
+        }
+      }
+      return res.json({ success: true, message: `Stage claim ${status.toUpperCase()} updated!` });
     }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Volunteer Leader / Judge Point Approval Controller
 exports.evaluateSubmission = async (req, res) => {
   try {
     const { submissionId, personalPoints, teamPoints } = req.body;
@@ -159,6 +280,7 @@ exports.evaluateSubmission = async (req, res) => {
 
       submission.personalPoints = pPts;
       submission.teamPoints = tPts;
+      submission.status = 'approved';
       await submission.save();
 
       if (submission.userId) {
@@ -192,19 +314,6 @@ exports.evaluateSubmission = async (req, res) => {
   }
 };
 
-exports.updateGameVisibility = async (req, res) => {
-  try {
-    const { gameId, gameNumber, visibleToUser, status } = req.body;
-    if (isMongoConnected()) {
-      if (gameId) await Game.findByIdAndUpdate(gameId, { visibleToUser });
-      else if (gameNumber) await Game.findOneAndUpdate({ gameNumber }, { status });
-    }
-    return res.json({ success: true, message: 'Game updated successfully!' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 exports.getUserSubmissions = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -212,7 +321,8 @@ exports.getUserSubmissions = async (req, res) => {
       const submissions = await Submission.find({ userId }).populate('gameId');
       return res.json({ success: true, submissions });
     } else {
-      const submissions = inMemoryData.submissions.filter(s => s.userId === userId);
+      if (!inMemoryData.submissions) inMemoryData.submissions = [];
+      const submissions = inMemoryData.submissions.filter(s => s.userId === userId || (s.userId && s.userId._id === userId));
       return res.json({ success: true, submissions });
     }
   } catch (error) {
@@ -229,6 +339,7 @@ exports.getAllSubmissions = async (req, res) => {
         .populate('gameId', 'name category type');
       return res.json({ success: true, submissions });
     } else {
+      if (!inMemoryData.submissions) inMemoryData.submissions = [];
       return res.json({ success: true, submissions: inMemoryData.submissions });
     }
   } catch (error) {

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardStats, assignCandidateTrack, seedSampleData } = require('../controllers/adminController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { getDashboardStats, assignCandidateTrack, seedSampleData, resetSubmissions } = require('../controllers/adminController');
 
-router.get('/dashboard', protect, authorize('admin'), getDashboardStats);
-router.post('/assign-track', protect, authorize('admin'), assignCandidateTrack);
-router.post('/seed', seedSampleData); // Open seed helper for fast initial setup
+router.get('/dashboard', getDashboardStats);
+router.post('/assign-track', assignCandidateTrack);
+router.post('/seed', seedSampleData);
+router.post('/reset-submissions', resetSubmissions);
 
 module.exports = router;

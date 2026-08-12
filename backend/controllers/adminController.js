@@ -74,6 +74,33 @@ exports.assignCandidateTrack = async (req, res) => {
   }
 };
 
+exports.resetSubmissions = async (req, res) => {
+  try {
+    if (isMongoConnected()) {
+      await Submission.deleteMany({});
+      await User.updateMany({}, { personalPoints: 0, completedGames: [] });
+      await Group.updateMany({}, { teamPoints: 0 });
+    }
+    inMemoryData.submissions = [];
+    inMemoryData.users.forEach(u => {
+      u.personalPoints = 0;
+      u.individualPoints = 0;
+      u.completedGames = [];
+    });
+    inMemoryData.groups.forEach(g => {
+      g.teamPoints = 0;
+      g.totalTeamPoints = 0;
+    });
+
+    return res.json({
+      success: true,
+      message: 'Reset all submissions, points, and activity logs across MongoDB & memory!'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.seedSampleData = async (req, res) => {
   try {
     const mockStudents = [

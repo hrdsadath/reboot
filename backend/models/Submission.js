@@ -20,6 +20,11 @@ const submissionSchema = new mongoose.Schema(
       required: true,
     },
 
+    gameNumber: {
+      type: Number,
+      default: 1,
+    },
+
     choice: {
       type: String,
       default: null,
@@ -38,6 +43,12 @@ const submissionSchema = new mongoose.Schema(
     teamPoints: {
       type: Number,
       default: 0,
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
     },
   },
   {
