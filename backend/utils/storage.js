@@ -31,20 +31,23 @@ const inMemoryData = {
   groups: Array.from({ length: 8 }, (_, i) => ({
     _id: `group_${i + 1}`,
     groupNumber: i + 1,
+    name: `Group ${i + 1}`,
     groupName: `Group ${i + 1} - ${['Alpha', 'Blaze', 'Catalyst', 'Dynamo', 'Echo', 'Flux', 'Genesis', 'Hyperion'][i]}`,
     leaderId: i === 0 ? 'leader_1' : null,
     leaderName: i === 0 ? 'Alex Vance' : 'To be assigned',
     totalTeamPoints: 0,
     members: i === 0 ? ['leader_1'] : [],
-    isRevealed: false // Default HIDDEN until Game 2 ends!
+    isRevealed: false,
+    unlockedGames: [1],
+    pendingUnlockRequests: []
   })),
   games: [
     {
       _id: 'game_1',
       gameNumber: 1,
-      title: 'Introduce Yourself (Stage vs Screen)',
+      title: 'Game 1: Icebreaker Spotlight Pitch',
       targetLeadTrack: 'General',
-      description: 'Break the ice! Pitch yourself to the IEDC panel. Choose whether to present live on stage or submit your pitch via the app.',
+      description: 'Introduce yourself to the IEDC community! Pitch live on stage for +20 PTS (requires Admin stage verification) or submit on app for +5 PTS automatically.',
       gameType: 'individual',
       maxPoints: 20,
       status: 'active',
@@ -57,19 +60,19 @@ const inMemoryData = {
     {
       _id: 'game_2',
       gameNumber: 2,
-      title: 'Tech Hack-Sprint (Tech Lead Track)',
+      title: 'Game 2: College Campus Innovation Hub Pitch',
       targetLeadTrack: 'Tech',
-      description: 'Solve a real campus innovation problem statement! Draft a quick system concept, flowchart, or tech logic solution.',
+      description: 'Describe your college campus and share 2 innovative ideas to improve student developer culture and campus startup ecosystem! (Dummy testing challenge).',
       gameType: 'individual',
       maxPoints: 30,
-      status: 'active',
+      status: 'locked',
       options: [],
-      revealsGroupAfter: true // GROUPS REVEALED AFTER THIS GAME!
+      revealsGroupAfter: true
     },
     {
       _id: 'game_3',
       gameNumber: 3,
-      title: 'Brand & Identity (Creative Lead Track)',
+      title: 'Game 3: Brand & Identity (Creative Lead)',
       targetLeadTrack: 'Creative',
       description: 'Collaborate with your newly revealed team! Design a startup logo concept, taglines, and visual identity poster.',
       gameType: 'team',
@@ -81,7 +84,7 @@ const inMemoryData = {
     {
       _id: 'game_4',
       gameNumber: 4,
-      title: 'Viral Surge (Marketing Lead Track)',
+      title: 'Game 4: Viral Surge (Marketing Lead)',
       targetLeadTrack: 'Marketing',
       description: 'Develop a growth-hacking campaign & 60-second viral marketing pitch strategy for an IEDC flagship startup.',
       gameType: 'team',
@@ -93,7 +96,7 @@ const inMemoryData = {
     {
       _id: 'game_5',
       gameNumber: 5,
-      title: 'Crisis & Execution Ops (Operating Lead Track)',
+      title: 'Game 5: Crisis & Execution Ops (Operating Lead)',
       targetLeadTrack: 'Operating',
       description: 'Operational simulation: Allocate event budgets under strict financial limits & manage 2 live event bottlenecks.',
       gameType: 'team',
@@ -105,7 +108,7 @@ const inMemoryData = {
     {
       _id: 'game_6',
       gameNumber: 6,
-      title: 'Patents & Deep Research (IPR & Research Lead Track)',
+      title: 'Game 6: Patents & Deep Research (IPR & Research Lead)',
       targetLeadTrack: 'IPR & Research',
       description: 'Conduct a novelty check on a deep-tech innovation, formulate patentable claims & defend your abstract to the IEDC jury.',
       gameType: 'individual',

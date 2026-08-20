@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { apiRequest } from '@/lib/api';
-import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck } from 'lucide-react';
+import { User, Mail, Phone, Rocket, ArrowRight, BookOpen, Hash, ShieldCheck, UserCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -77,6 +77,41 @@ export default function LoginPage() {
       } else {
         setErrorMsg(res.message || 'Login failed.');
       }
+    }
+    setLoading(false);
+  };
+
+  const handleQuickCandidateLogin = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    const randomId = Math.floor(1000 + Math.random() * 9000);
+    const testEmail = `candidate_${randomId}@student.edu`;
+    const testName = `Candidate #${randomId}`;
+    const testPhone = `98000${randomId}`;
+    const testAdm = `ADM${randomId}`;
+
+    const res = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: testName,
+        email: testEmail,
+        phone: testPhone,
+        admissionNo: testAdm,
+        department: 'Computer Science'
+      })
+    });
+
+    if (res.success && res.token) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('iedc_token', res.token);
+        localStorage.setItem('iedc_user', JSON.stringify(res.user));
+      }
+      setSuccessMsg(`Signed in as fresh student candidate (${testName})! Redirecting...`);
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 800);
+    } else {
+      setErrorMsg('Candidate quick sign in failed.');
     }
     setLoading(false);
   };
@@ -236,8 +271,16 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Admin Button */}
-          <div className="mt-4 pt-4 border-t border-slate-800/80">
+          {/* Quick Login Buttons */}
+          <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-2">
+            <button
+              onClick={handleQuickCandidateLogin}
+              className="w-full py-2.5 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-bold text-xs transition-all flex items-center justify-center gap-2"
+            >
+              <UserCheck className="w-4 h-4 text-indigo-400" />
+              <span>Instant Test Candidate Sign-In</span>
+            </button>
+
             <button
               onClick={handleQuickAdminLogin}
               className="w-full py-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center justify-center gap-2"

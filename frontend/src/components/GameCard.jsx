@@ -1,13 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lock, CheckCircle2, Award, Tv, Smartphone, Send, Sparkles } from 'lucide-react';
+import { Lock, CheckCircle2, Award, Tv, Smartphone, Send, Sparkles, KeyRound, Clock, ShieldAlert } from 'lucide-react';
 
-export default function GameCard({ game, onSubmit, isSubmitted }) {
+export default function GameCard({
+  game,
+  onSubmit,
+  isSubmitted,
+  isLocked,
+  isUnlockPending,
+  canRequestUnlock,
+  onRequestUnlock
+}) {
   const [selectedOption, setSelectedOption] = useState(null); // 'On Stage' | 'On App'
   const [submissionText, setSubmissionText] = useState('');
   const [submissionUrl, setSubmissionUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const isGame1 = game.gameNumber === 1 || (game.name && game.name.includes('Game 1'));
 
@@ -22,6 +31,79 @@ export default function GameCard({ game, onSubmit, isSubmitted }) {
     setIsSubmitting(false);
   };
 
+  const handleRequestUnlockClick = async () => {
+    setIsRequesting(true);
+    await onRequestUnlock(game.gameNumber);
+    setIsRequesting(false);
+  };
+
+  // RENDER LOCKED GAME CARD STATE
+  if (isLocked) {
+    return (
+      <div className="glass-card rounded-3xl p-6 relative overflow-hidden transition-all border border-slate-800 bg-slate-950/80 flex flex-col justify-between space-y-6">
+        <div>
+          {/* Top Bar */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl bg-slate-900 text-slate-500 font-extrabold flex items-center justify-center text-sm border border-slate-800">
+                #{game.gameNumber || '2'}
+              </span>
+              <span className="text-xs uppercase font-extrabold px-3 py-1 rounded-full border bg-slate-900 text-slate-400 border-slate-800">
+                {game.category || 'Lead Track'}
+              </span>
+            </div>
+
+            <span className="flex items-center gap-1.5 text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800 px-3 py-1 rounded-full">
+              <Lock className="w-3.5 h-3.5 text-amber-400" /> Locked Game
+            </span>
+          </div>
+
+          {/* Title & Description */}
+          <h3 className="text-xl font-bold text-slate-300 mb-2 tracking-tight">
+            {game.name || `Challenge #${game.gameNumber}`}
+          </h3>
+          <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+            {game.description || 'This lead track is locked by Admin for your Group.'}
+          </p>
+        </div>
+
+        {/* Locking Action / Status Panel */}
+        <div className="space-y-3">
+          {isUnlockPending ? (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0 animate-spin" />
+              <div>
+                <div>Unlock Request Pending Admin Approval</div>
+                <div className="text-[11px] font-normal text-amber-300/80">Admin will unlock Game #{game.gameNumber} for your Group shortly!</div>
+              </div>
+            </div>
+          ) : canRequestUnlock ? (
+            <button
+              onClick={handleRequestUnlockClick}
+              disabled={isRequesting}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              {isRequesting ? (
+                <span>Sending Request...</span>
+              ) : (
+                <>
+                  <KeyRound className="w-4 h-4" />
+                  <span>Request Admin to Unlock Game #{game.gameNumber} for Group</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 text-xs font-semibold text-center flex items-center justify-center gap-2">
+              <Lock className="w-4 h-4 text-slate-600" />
+              <span>Complete Game #{game.gameNumber - 1} first to request unlock</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // RENDER UNLOCKED GAME CARD STATE
   return (
     <div className="glass-card glass-card-hover rounded-3xl p-6 relative overflow-hidden transition-all border border-indigo-500/40 glow-indigo flex flex-col justify-between">
       

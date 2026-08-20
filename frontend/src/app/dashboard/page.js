@@ -7,7 +7,7 @@ import GameCard from '@/components/GameCard';
 import Leaderboard from '@/components/Leaderboard';
 import TeamRevealModal from '@/components/TeamRevealModal';
 import { apiRequest } from '@/lib/api';
-import { User, Award, Lock, Trophy, Sparkles, CheckCircle2, Crown, RefreshCw, CheckSquare } from 'lucide-react';
+import { User, Award, Lock, Unlock, Trophy, Sparkles, CheckCircle2, Crown, RefreshCw, CheckSquare, KeyRound, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -15,15 +15,16 @@ export default function DashboardPage() {
   const [games, setGames] = useState([]);
   const [myGroup, setMyGroup] = useState(null);
   const [isGroupRevealed, setIsGroupRevealed] = useState(false);
+  const [unlockedGames, setUnlockedGames] = useState([1]);
+  const [pendingUnlockRequests, setPendingUnlockRequests] = useState([]);
   const [userSubmissions, setUserSubmissions] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [allGroups, setAllGroups] = useState([]);
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState('');
 
   const fetchData = async () => {
-    setLoading(true);
-
     let userObj = null;
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('iedc_user');
@@ -40,11 +41,17 @@ export default function DashboardPage() {
       return;
     }
 
-    // 1. Fetch Group Info
+    // 1. Fetch Group Info & Unlocked Games
     const groupRes = await apiRequest('/groups/my-group');
     if (groupRes.success) {
       setMyGroup(groupRes.group);
       setIsGroupRevealed(groupRes.isRevealed);
+      if (groupRes.unlockedGames && groupRes.unlockedGames.length > 0) {
+        setUnlockedGames(groupRes.unlockedGames);
+      } else {
+        setUnlockedGames([1]);
+      }
+      setPendingUnlockRequests(groupRes.pendingUnlockRequests || []);
     }
 
     // 2. Fetch Games List
@@ -71,6 +78,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
+
+    // Live Polling every 3 seconds to dynamically reflect Admin Game Unlocks in real time!
+    const interval = setInterval(() => {
+      fetchData();
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleTaskSubmit = async (gameNumber, chosenOption, submissionText, submissionUrl) => {
@@ -99,12 +113,35 @@ export default function DashboardPage() {
     }
   };
 
+  const handleRequestUnlock = async (gameNumber) => {
+    const res = await apiRequest('/groups/request-unlock', {
+      method: 'POST',
+      body: JSON.stringify({ gameNumber })
+    });
+
+    if (res.success) {
+      setToastMsg(res.message);
+      setTimeout(() => setToastMsg(''), 4000);
+      fetchData();
+    } else {
+      alert(res.message || 'Request failed');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-8">
         
+        {/* Toast Alert */}
+        {toastMsg && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-bold flex items-center gap-2 animate-fadeIn">
+            <KeyRound className="w-5 h-5" />
+            <span>{toastMsg}</span>
+          </div>
+        )}
+
         {/* Top Student Profile & Leader Summary */}
         <div className="glass-card rounded-3xl p-6 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
@@ -153,7 +190,7 @@ export default function DashboardPage() {
             <button
               onClick={fetchData}
               className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-              title="Refresh Stats"
+              title="Refresh Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -208,6 +245,44 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* GROUP GAME UNLOCK PROGRESS BANNER */}
+        <div className="glass-card rounded-3xl p-5 border border-indigo-500/30 bg-slate-950/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs uppercase font-extrabold text-indigo-400 tracking-wider">Group Game Access Status</div>
+              <div className="text-sm font-bold text-white">
+                {myGroup?.name || `Group #${currentUser?.groupNumber || '1'}`}: {unlockedGames.length} of 6 Games Unlocked for Team
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {[1, 2, 3, 4, 5, 6].map((gNum) => {
+              const isUnlocked = gNum === 1 || unlockedGames.includes(gNum);
+              const isPending = pendingUnlockRequests.some(r => Number(r.gameNumber) === gNum);
+
+              return (
+                <div
+                  key={gNum}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 border ${
+                    isUnlocked
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : isPending
+                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                      : 'bg-slate-900 text-slate-500 border-slate-800'
+                  }`}
+                >
+                  {isUnlocked ? <Unlock className="w-3 h-3 text-emerald-400" /> : <Lock className="w-3 h-3 text-slate-500" />}
+                  <span>Game #{gNum}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* STUDENT'S ACTIVITIES & SUBMISSIONS SUMMARY */}
         <div className="glass-card rounded-3xl p-6 border border-slate-800">
           <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
@@ -250,7 +325,7 @@ export default function DashboardPage() {
                 <Sparkles className="w-6 h-6 text-indigo-400" />
                 6 Selection Challenges
               </h2>
-              <p className="text-xs text-slate-400">Complete each challenge to earn points</p>
+              <p className="text-xs text-slate-400">Complete Game 1 to activate Game 2 unlock request for your entire group</p>
             </div>
             <span className="text-xs text-slate-400 font-mono">
               {userSubmissions.length} of {games.length} Completed
@@ -259,12 +334,31 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {games.map((game) => {
-              const isSubmitted = userSubmissions.some((s) => (s.gameNumber === game.gameNumber || (s.gameId && s.gameId._id === game._id)));
+              const gNum = Number(game.gameNumber) || 1;
+              
+              // STRICT PER-GAME SUBMISSION MATCH: Match ONLY by Number(s.gameNumber) === gNum
+              const isSubmitted = userSubmissions.some((s) => Number(s.gameNumber) === gNum);
+              
+              // Unlocking rules: Game 1 is always unlocked. Games 2-6 unlocked if in unlockedGames array.
+              const isUnlocked = gNum === 1 || unlockedGames.includes(gNum);
+              const isLocked = !isUnlocked;
+              
+              // Pending request for this group (if ANY member of the group requested it)
+              const isUnlockPending = pendingUnlockRequests.some(r => Number(r.gameNumber) === gNum);
+
+              // Can candidate request unlock? Candidate must have completed previous game (gNum - 1)
+              const previousGameSubmitted = gNum === 1 ? true : userSubmissions.some(s => Number(s.gameNumber) === (gNum - 1));
+              const canRequestUnlock = isLocked && previousGameSubmitted;
+
               return (
                 <GameCard
-                  key={game._id || game.gameNumber}
+                  key={game._id || gNum}
                   game={game}
                   isSubmitted={isSubmitted}
+                  isLocked={isLocked}
+                  isUnlockPending={isUnlockPending}
+                  canRequestUnlock={canRequestUnlock}
+                  onRequestUnlock={handleRequestUnlock}
                   onSubmit={handleTaskSubmit}
                 />
               );

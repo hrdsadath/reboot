@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const gameSchema = new mongoose.Schema(
   {
+    gameNumber: {
+      type: Number,
+      required: true,
+    },
+
     name: {
       type: String,
       required: true,
@@ -9,20 +14,17 @@ const gameSchema = new mongoose.Schema(
 
     category: {
       type: String,
-      enum: [
-        "iprdResearch",
-        "operating",
-        "marketing",
-        "tech",
-        "creative",
-      ],
       required: true,
     },
 
     type: {
       type: String,
-      enum: ["individual", "group"],
       required: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
     },
 
     options: {

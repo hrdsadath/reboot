@@ -41,7 +41,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         
         {/* Brand Logo */}
-        <Link href={isAdmin ? "/admin" : isLeader ? "/leader" : "/dashboard"} className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
             <Rocket className="w-5 h-5 text-white animate-pulse" />
           </div>
@@ -59,7 +59,7 @@ export default function Navbar() {
         {/* Navigation Portals - Filtered strictly by User Role */}
         <div className="hidden md:flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
           
-          {/* Student Arena: ONLY for candidate users (Admin is NOT a candidate participant) */}
+          {/* Student Arena: ONLY for candidate users */}
           {isCandidate && (
             <Link
               href="/dashboard"
@@ -136,11 +136,11 @@ export default function Navbar() {
             </div>
           ) : (
             <Link
-              href="/"
+              href="/login"
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg hover:shadow-indigo-500/25 transition-all"
             >
               <User className="w-4 h-4" />
-              <span>Candidate Sign In</span>
+              <span>Register / Sign In</span>
             </Link>
           )}
         </div>

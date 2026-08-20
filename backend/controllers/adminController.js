@@ -79,7 +79,7 @@ exports.resetSubmissions = async (req, res) => {
     if (isMongoConnected()) {
       await Submission.deleteMany({});
       await User.updateMany({}, { personalPoints: 0, completedGames: [] });
-      await Group.updateMany({}, { teamPoints: 0 });
+      await Group.updateMany({}, { teamPoints: 0, unlockedGames: [1], pendingUnlockRequests: [] });
     }
     inMemoryData.submissions = [];
     inMemoryData.users.forEach(u => {
@@ -90,11 +90,13 @@ exports.resetSubmissions = async (req, res) => {
     inMemoryData.groups.forEach(g => {
       g.teamPoints = 0;
       g.totalTeamPoints = 0;
+      g.unlockedGames = [1];
+      g.pendingUnlockRequests = [];
     });
 
     return res.json({
       success: true,
-      message: 'Reset all submissions, points, and activity logs across MongoDB & memory!'
+      message: 'Reset all submissions & locked Games 2-6 for all groups! Game 1 remains active.'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -127,8 +129,14 @@ exports.seedSampleData = async (req, res) => {
             name: groupName,
             visibleAfterGame: 2,
             teamPoints: 0,
+            unlockedGames: [1],
+            pendingUnlockRequests: [],
             memberIds: []
           });
+        } else {
+          group.unlockedGames = [1];
+          group.pendingUnlockRequests = [];
+          await group.save();
         }
 
         let created = await User.findOne({ email: student.email });
@@ -148,7 +156,7 @@ exports.seedSampleData = async (req, res) => {
           await group.save();
         }
       }
-      return res.json({ success: true, message: 'Seeded 9 sample candidates across 8 round-robin groups in MongoDB Atlas!' });
+      return res.json({ success: true, message: 'Seeded sample candidates with locked Games 2-6 across 8 round-robin groups in MongoDB Atlas!' });
     } else {
       mockStudents.forEach((student, i) => {
         const groupNumber = (i % 8) + 1;
@@ -174,9 +182,11 @@ exports.seedSampleData = async (req, res) => {
           };
           inMemoryData.users.push(newUser);
           targetGroup.members.push(userId);
+          targetGroup.unlockedGames = [1];
+          targetGroup.pendingUnlockRequests = [];
         }
       });
-      return res.json({ success: true, message: 'Seeded sample candidates in memory successfully!' });
+      return res.json({ success: true, message: 'Seeded sample candidates in memory with locked Games 2-6!' });
     }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

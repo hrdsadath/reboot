@@ -30,6 +30,19 @@ const groupSchema = new mongoose.Schema(
       type: Number,
       default: 2,
     },
+
+    unlockedGames: {
+      type: [Number],
+      default: [1],
+    },
+
+    pendingUnlockRequests: [
+      {
+        gameNumber: { type: Number },
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        requestedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

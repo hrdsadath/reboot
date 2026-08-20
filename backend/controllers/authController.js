@@ -315,3 +315,74 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, phone } = req.body;
+
+    if (!email || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter both Email Address and Phone Number to verify Admin access.'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+
+    if (isMongoConnected()) {
+      const user = await User.findOne({
+        email: cleanEmail,
+        phone: cleanPhone,
+        role: 'admin'
+      });
+
+      if (!user) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access Denied: Email and Phone Number do not match a registered Executive Admin account.'
+        });
+      }
+
+      const token = jwt.sign({ id: user._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+
+      return res.json({
+        success: true,
+        message: `Admin access verified for ${user.name} (${user.email})`,
+        token,
+        admin: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          admissionNo: user.admissionNo,
+          department: user.department,
+          role: 'admin',
+          personalPoints: user.personalPoints || 100
+        }
+      });
+    } else {
+      let user = inMemoryData.users.find(u =>
+        u.email.toLowerCase() === cleanEmail && u.phone === cleanPhone && u.role === 'admin'
+      );
+
+      if (!user) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access Denied: Email and Phone Number do not match a registered Executive Admin account.'
+        });
+      }
+
+      const token = jwt.sign({ id: user._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({
+        success: true,
+        message: `Admin access verified for ${user.name} (${user.email})`,
+        token,
+        admin: user
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

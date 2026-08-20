@@ -12,15 +12,17 @@ const defaultGames = [
     type: 'individual',
     options: ['On Stage', 'On App'],
     points: { personal: 20, team: 0 },
+    description: 'Introduce yourself to the IEDC community! Pitch live on stage for +20 PTS (requires Admin stage verification) or submit on app for +5 PTS automatically.',
     visibleToUser: true
   },
   {
     gameNumber: 2,
-    name: 'Game 2: Tech Hack-Sprint (Tech Lead)',
+    name: 'Game 2: College Campus Innovation Hub Pitch',
     category: 'tech',
     type: 'individual',
     options: [],
     points: { personal: 30, team: 0 },
+    description: 'Describe your college campus and share 2 innovative ideas to improve student developer culture and campus startup ecosystem! (Dummy testing challenge).',
     visibleToUser: true
   },
   {
@@ -30,6 +32,7 @@ const defaultGames = [
     type: 'group',
     options: [],
     points: { personal: 10, team: 50 },
+    description: 'Collaborate with your newly revealed team! Design a startup logo concept, taglines, and visual identity poster.',
     visibleToUser: false
   },
   {
@@ -39,6 +42,7 @@ const defaultGames = [
     type: 'group',
     options: [],
     points: { personal: 10, team: 50 },
+    description: 'Develop a growth-hacking campaign & 60-second viral marketing pitch strategy for an IEDC flagship startup.',
     visibleToUser: false
   },
   {
@@ -48,6 +52,7 @@ const defaultGames = [
     type: 'group',
     options: [],
     points: { personal: 10, team: 50 },
+    description: 'Operational simulation: Allocate event budgets under strict financial limits & manage 2 live event bottlenecks.',
     visibleToUser: false
   },
   {
@@ -57,6 +62,7 @@ const defaultGames = [
     type: 'individual',
     options: [],
     points: { personal: 50, team: 0 },
+    description: 'Conduct a novelty check on a deep-tech innovation, formulate patentable claims & defend your abstract to the IEDC jury.',
     visibleToUser: false
   }
 ];
@@ -64,9 +70,19 @@ const defaultGames = [
 exports.getGames = async (req, res) => {
   try {
     if (isMongoConnected()) {
-      let games = await Game.find();
+      let games = await Game.find().sort({ gameNumber: 1 });
       if (games.length === 0) {
         games = await Game.insertMany(defaultGames);
+      } else {
+        // Sync Game 2 dummy campus challenge update into MongoDB Atlas
+        await Game.findOneAndUpdate(
+          { gameNumber: 2 },
+          {
+            name: 'Game 2: College Campus Innovation Hub Pitch',
+            description: 'Describe your college campus and share 2 innovative ideas to improve student developer culture and campus startup ecosystem! (Dummy testing challenge).'
+          }
+        );
+        games = await Game.find().sort({ gameNumber: 1 });
       }
       return res.json({ success: true, games });
     } else {

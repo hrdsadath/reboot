@@ -13,6 +13,8 @@ export async function apiRequest(endpoint, options = {}) {
   const token = getAuthToken();
   const headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    Pragma: 'no-cache',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers
   };
@@ -22,6 +24,7 @@ export async function apiRequest(endpoint, options = {}) {
 
   try {
     const res = await fetch(fullUrl, {
+      cache: 'no-store',
       ...options,
       headers
     });
